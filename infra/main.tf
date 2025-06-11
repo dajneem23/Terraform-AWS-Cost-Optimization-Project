@@ -37,7 +37,56 @@ resource "aws_s3_bucket" "main" {
     }
   }
 }
+# This resource defines rules to automatically manage objects in the main bucket,
+# saving costs by transitioning objects to cheaper storage and deleting old ones.
+resource "aws_s3_bucket_lifecycle_configuration" "main_lifecycle" {
+  # This depends_on is not strictly required as Terraform infers it from the
+  # bucket attribute, but it makes the relationship explicit.
+  depends_on = [aws_s3_bucket.main]
 
+  bucket = aws_s3_bucket.main.id
+
+  # RULE 1: Transition and Expire regular objects
+  rule {
+    id     = "TransitionAndExpire"
+    status = "Enabled"
+
+    # You could filter this rule to apply only to certain prefixes, e.g.,
+    # filter { prefix = "logs/" }
+    # Without a filter, it applies to all objects in the bucket.
+
+    # After 30 days, move objects to Standard-Infrequent Access.
+    # Good for data that is not accessed often but needs to be available quickly.
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    # After 90 days, move objects to Glacier Instant Retrieval.
+    # Good for long-term archiving where you still need millisecond access.
+    transition {
+      days          = 90
+      storage_class = "GLACIER_IR"
+    }
+
+    # After 365 days, permanently delete the objects.
+    expiration {
+      days = 365
+    }
+  }
+
+  # RULE 2: Clean up incomplete multipart uploads
+  # This is a critical cost-saving measure for buckets that receive large files.
+  rule {
+    id     = "AbortIncompleteUploads"
+    status = "Enabled"
+
+    # Abort and delete failed/incomplete multipart uploads after 7 days.
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
 # --- STRATEGY: SPOT INSTANCES & AUTO SCALING ---
 resource "aws_launch_template" "g4dn_spot_template" {
   name_prefix   = "g4dn-spot-template-"
@@ -64,8 +113,8 @@ resource "aws_launch_template" "g4dn_spot_template" {
 
 resource "aws_autoscaling_group" "g4dn_asg" {
   name                = "g4dn-asg"
-  min_size            = 1      # Always have at least 1 instance.
-  max_size            = var.max_num_instances      # Allow scaling up to 5 instances.
+  min_size            = 1                     # Always have at least 1 instance.
+  max_size            = var.max_num_instances # Allow scaling up to 5 instances.
   desired_capacity    = 1
   vpc_zone_identifier = [aws_subnet.public.id]
   health_check_type   = "EC2"
@@ -147,7 +196,7 @@ resource "aws_lambda_function" "instance_scheduler" {
   role             = aws_iam_role.lambda_scheduler_role.arn
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-
+  architectures    = ["arm64"]
   environment {
     variables = {
       AWS_REGION = var.aws_region
