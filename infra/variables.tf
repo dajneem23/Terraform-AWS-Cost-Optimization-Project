@@ -41,3 +41,9 @@ variable "scale_down_cpu_threshold" {
   type        = number
   default     = 25
 }
+
+variable "s3_alert_days_before_expiration" {
+  description = "Number of days before S3 object expiration (by lifecycle rule) to send an alert."
+  type        = number
+  default     = 7
+}

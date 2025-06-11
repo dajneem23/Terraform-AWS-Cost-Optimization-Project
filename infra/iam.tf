@@ -97,3 +97,45 @@ resource "aws_iam_role_policy_attachment" "lambda_scheduler_attach" {
   role       = aws_iam_role.lambda_scheduler_role.name
   policy_arn = aws_iam_policy.lambda_scheduler_policy.arn
 }
+
+# --- IAM Role & Policy for S3 Expiration Alerter Lambda ---
+resource "aws_iam_role" "s3_expiration_alerter_lambda_role" {
+  name = "s3-expiration-alerter-lambda-role"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_policy" "s3_expiration_alerter_lambda_policy" {
+  name   = "s3-expiration-alerter-lambda-policy"
+  policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "arn:aws:logs:*:*:*" # Standard Lambda logging
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"] # To list objects and their LastModified dates
+        Resource = aws_s3_bucket.main.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "sns:Publish" # To send notifications
+        Resource = aws_sns_topic.s3_expiration_alerts.arn # Reference the SNS topic defined in main.tf
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "s3_expiration_alerter_lambda_attach" {
+  role       = aws_iam_role.s3_expiration_alerter_lambda_role.name
+  policy_arn = aws_iam_policy.s3_expiration_alerter_lambda_policy.arn
+}
