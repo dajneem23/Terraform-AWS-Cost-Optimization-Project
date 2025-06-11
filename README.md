@@ -63,5 +63,5 @@ This project deploys a highly cost-optimized and scalable EC2 environment on AWS
 # Disclaimer
 
 This project is for showcasing cost optimization strategies and may not be suitable for production use without further customization and testing. Always review and test configurations in a safe environment before deploying to production.
-those codes will be used to other projects.
+This code can be used in other projects.
 Feel free to modify and adapt them to your needs.
