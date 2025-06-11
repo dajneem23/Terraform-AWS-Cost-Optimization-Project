@@ -56,12 +56,12 @@ def lambda_handler(event, context):
                 Message=consolidated_message,
                 Subject=subject
             )
-            print(f"Published {len(notifications)} alert(s) to SNS topic {SNS_TOPIC_ARN}")
+            logger.info(f"Published {len(notifications)} alert(s) to SNS topic {SNS_TOPIC_ARN}")
         else:
-            print("No objects found nearing expiration within the alert window.")
+            logger.info("No objects found nearing expiration within the alert window.")
 
     except Exception as e:
-        print(f"Error processing S3 expiration alerts: {e}")
+        logger.error(f"Error processing S3 expiration alerts: {e}")
         raise e
 
     return {
