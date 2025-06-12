@@ -1,44 +1,43 @@
 import boto3
 import os
+import logging
 
-# Define the tag key and value to identify instances to stop.
-TAG_KEY = "Schedulable"
-TAG_VALUE = "true"
-REGION = os.environ['AWS_REGION']
+# Configure logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-ec2 = boto3.client('ec2', region_name=REGION)
+REGION = os.environ.get('AWS_REGION')
+ASG_NAME = os.environ.get('ASG_NAME')
+
+if not REGION:
+    logger.error("AWS_REGION environment variable not set.")
+    raise ValueError("AWS_REGION environment variable not set.")
+if not ASG_NAME:
+    logger.error("ASG_NAME environment variable not set.")
+    raise ValueError("ASG_NAME environment variable not set.")
+
+autoscaling_client = boto3.client('autoscaling', region_name=REGION)
 
 def lambda_handler(event, context):
     """
-    This function finds all EC2 instances with the tag 'Schedulable: true'.
-    If more than one instance is running, it stops all but one to maintain
-    a minimal presence.
+    This function sets the MinSize and DesiredCapacity of the specified
+    Auto Scaling Group (ASG) to 0. This effectively scales down the ASG
+    and terminates its instances for the scheduled "off" period.
     """
-    # Find all running instances with the specified tag
-    response = ec2.describe_instances(
-        Filters=[
-            {'Name': f'tag:{TAG_KEY}', 'Values': [TAG_VALUE]},
-            {'Name': 'instance-state-name', 'Values': ['running']}
-        ]
-    )
+    logger.info(f"Attempting to scale down Auto Scaling Group: {ASG_NAME}")
 
-    running_instance_ids = []
-    for reservation in response['Reservations']:
-        for instance in reservation['Instances']:
-            running_instance_ids.append(instance['InstanceId'])
-
-    # If we have more than one instance, we will stop all except the first one in the list.
-    # The Auto Scaling Group will handle maintaining the desired capacity later if needed.
-    instances_to_stop = running_instance_ids[1:]
-    
-    print(f"Found {len(running_instance_ids)} running instances. Stopping {len(instances_to_stop)} to keep one active.")
-    print(f"Instances to be stopped: {', '.join(instances_to_stop)}")
-
-    # Stop the selected instances
-    ec2.stop_instances(InstanceIds=instances_to_stop)
-
-    success_message = f"Successfully sent stop command for instances: {', '.join(instances_to_stop)}"
-    print(success_message)
+    try:
+        autoscaling_client.update_auto_scaling_group(
+            AutoScalingGroupName=ASG_NAME,
+            MinSize=0,
+            DesiredCapacity=0
+        )
+        success_message = f"Successfully set MinSize and DesiredCapacity to 0 for ASG: {ASG_NAME}"
+        logger.info(success_message)
+    except Exception as e:
+        error_message = f"Error updating ASG '{ASG_NAME}': {str(e)}"
+        logger.error(error_message)
+        raise e # Re-raise the exception to indicate failure to Lambda
 
     return {
         'statusCode': 200,
