@@ -240,3 +240,77 @@ resource "aws_budgets_budget" "monthly_total" {
     subscriber_email_addresses = [var.notification_email]
   }
 }
+
+# --- STRATEGY: S3 OBJECT EXPIRATION ALERTS ---
+
+# SNS Topic for S3 expiration alerts
+resource "aws_sns_topic" "s3_expiration_alerts" {
+  name = "s3-object-expiration-alerts-topic"
+  tags = {
+    Description = "SNS topic for alerts about S3 objects nearing lifecycle expiration"
+  }
+}
+
+# Subscribe an email endpoint to the SNS topic
+resource "aws_sns_topic_subscription" "s3_expiration_email_alert_subscription" {
+  topic_arn = aws_sns_topic.s3_expiration_alerts.arn
+  protocol  = "email"
+  endpoint  = var.notification_email # Reusing the existing notification email variable
+}
+
+# Package the S3 expiration alerter Lambda function
+data "archive_file" "s3_expiration_alerter_zip" {
+  type        = "zip"
+  source_file = "${path.module}/lambda/s3_expiration_alerter.py"
+  output_path = "${path.module}/lambda/s3_expiration_alerter.zip" # Terraform will create this zip
+}
+
+# Lambda function to check for S3 objects nearing expiration
+resource "aws_lambda_function" "s3_expiration_alerter" {
+  function_name    = "S3ObjectExpirationAlerter"
+  handler          = "s3_expiration_alerter.lambda_handler" # filename.handler_function
+  runtime          = "python3.9"
+  role             = aws_iam_role.s3_expiration_alerter_lambda_role.arn # Defined in iam.tf
+  filename         = data.archive_file.s3_expiration_alerter_zip.output_path
+  source_code_hash = data.archive_file.s3_expiration_alerter_zip.output_base64sha256
+  timeout          = 300 # 5 minutes, adjust if your bucket has many objects
+  memory_size      = 256 # Adjust as needed
+  architectures    = ["arm64"] # Match existing Lambda architecture
+
+  environment {
+    variables = {
+      S3_BUCKET_NAME                 = aws_s3_bucket.main.bucket
+      SNS_TOPIC_ARN                  = aws_sns_topic.s3_expiration_alerts.arn
+      ALERT_DAYS_BEFORE_EXPIRATION   = var.s3_alert_days_before_expiration
+      LIFECYCLE_EXPIRATION_DAYS      =  var.s3_lifecycle_expiration_days
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.s3_expiration_alerter_lambda_attach,
+    aws_sns_topic.s3_expiration_alerts
+  ]
+}
+
+# EventBridge (CloudWatch Events) rule to trigger the Lambda daily
+resource "aws_cloudwatch_event_rule" "daily_s3_expiration_check" {
+  name                = "daily-s3-object-expiration-check-rule"
+  description         = "Triggers Lambda daily to check for S3 objects nearing expiration"
+  schedule_expression = "cron(0 2 * * ? *)" # Runs daily at 2:00 AM UTC
+}
+
+# Target for the EventBridge rule: the S3 alerter Lambda
+resource "aws_cloudwatch_event_target" "s3_alerter_lambda_event_target" {
+  rule      = aws_cloudwatch_event_rule.daily_s3_expiration_check.name
+  target_id = "S3ExpirationAlerterLambdaTarget"
+  arn       = aws_lambda_function.s3_expiration_alerter.arn
+}
+
+# Permission for EventBridge to invoke the Lambda function
+resource "aws_lambda_permission" "allow_cloudwatch_to_s3_alerter_lambda" {
+  statement_id  = "AllowExecutionFromCloudWatchEvents"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.s3_expiration_alerter.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.daily_s3_expiration_check.arn
+}

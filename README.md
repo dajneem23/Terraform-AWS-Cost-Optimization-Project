@@ -59,3 +59,9 @@ This project deploys a highly cost-optimized and scalable EC2 environment on AWS
     ```sh
     terraform destroy -var="notification_email=your_email@example.com"
     ```
+
+# Disclaimer
+
+This project is for showcasing cost optimization strategies and may not be suitable for production use without further customization and testing. Always review and test configurations in a safe environment before deploying to production.
+This code can be used in other projects.
+Feel free to modify and adapt them to your needs.
