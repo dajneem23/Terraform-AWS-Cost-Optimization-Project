@@ -81,7 +81,9 @@ resource "aws_iam_policy" "lambda_scheduler_policy" {
     Statement = [{
       Action = [
         "ec2:DescribeInstances",
-        "ec2:StopInstances"
+        "ec2:StopInstances",
+        "autoscaling:UpdateAutoScalingGroup",
+        "autoscaling:DescribeAutoScalingGroups"
       ]
       Effect   = "Allow"
       Resource = "*"
