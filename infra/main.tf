@@ -282,7 +282,7 @@ resource "aws_lambda_function" "s3_expiration_alerter" {
       S3_BUCKET_NAME                 = aws_s3_bucket.main.bucket
       SNS_TOPIC_ARN                  = aws_sns_topic.s3_expiration_alerts.arn
       ALERT_DAYS_BEFORE_EXPIRATION   = var.s3_alert_days_before_expiration
-      LIFECYCLE_EXPIRATION_DAYS      = "365" # Matches your S3 lifecycle rule
+      LIFECYCLE_EXPIRATION_DAYS      =  var.s3_lifecycle_expiration_days
     }
   }
 

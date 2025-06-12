@@ -47,3 +47,8 @@ variable "s3_alert_days_before_expiration" {
   type        = number
   default     = 7
 }
+variable "s3_lifecycle_expiration_days" {
+  description = "Number of days after which S3 objects will be automatically deleted."
+  type        = number
+  default     = 365
+}
