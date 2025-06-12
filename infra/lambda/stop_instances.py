@@ -27,15 +27,6 @@ def lambda_handler(event, context):
         for instance in reservation['Instances']:
             running_instance_ids.append(instance['InstanceId'])
 
-    # --- NEW LOGIC: Only stop instances if more than one is running ---
-    if len(running_instance_ids) <= 1:
-        message = f"Found {len(running_instance_ids)} running instance(s). Keeping at least one running. No action taken."
-        print(message)
-        return {
-            'statusCode': 200,
-            'body': message
-        }
-
     # If we have more than one instance, we will stop all except the first one in the list.
     # The Auto Scaling Group will handle maintaining the desired capacity later if needed.
     instances_to_stop = running_instance_ids[1:]

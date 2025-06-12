@@ -204,10 +204,10 @@ resource "aws_lambda_function" "instance_scheduler" {
   }
 }
 
-# resource "aws_cloudwatch_event_rule" "daily_stop" {
-#   name                = "daily-ec2-stop-rule"
-#   schedule_expression = "cron(0 18 ? * MON-FRI *)"
-# }
+resource "aws_cloudwatch_event_rule" "daily_stop" {
+  name                = "daily-ec2-stop-rule"
+  schedule_expression = "cron(0 18 ? * MON-FRI *)"
+}
 
 resource "aws_cloudwatch_event_target" "lambda_target" {
   rule      = aws_cloudwatch_event_rule.daily_stop.name

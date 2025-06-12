@@ -9,7 +9,7 @@ variable "aws_region" {
 variable "instance_type" {
   description = "The EC2 instance type to use. Right-size this for your workload!"
   type        = string
-  default     = "g4dn.2xlarge" # GPU instance for ML workloads
+  default     = "g4dn.4xlarge" # GPU instance for ML workloads
 }
 
 variable "notification_email" {
